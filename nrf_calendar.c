@@ -12,34 +12,40 @@
  
 #include "nrf_calendar.h"
 #include "nrf.h"
+
+#include <stdbool.h>
  
-static struct tm time_struct, m_tm_return_time; 
+static struct tm time_struct, m_tm_return_time;
 static time_t m_time, m_last_calibrate_time = 0;
 static float m_calibrate_factor = 0.0f;
 static uint32_t m_rtc_increment = 60;
 static void (*cal_event_callback)(void) = 0;
-// Prescaler @ 33 = 1.007ms/RTC tick.
-const static uint32_t rtc_prescaler = 33;
+// Prescaler @ 32 = 1.007ms/RTC tick.
+const static uint32_t rtc_prescaler = 32;
 // 1.007ms * 993 = 1.00003s, used to scale RTC ticks to seconds.
 const static uint32_t cc_scaler = 993;
+bool initialized = false;
  
 void nrf_cal_init(void)
 {
-    // Select the 32 kHz crystal and start the 32 kHz clock
-    NRF_CLOCK->LFCLKSRC = CLOCK_LFCLKSRC_SRC_Xtal << CLOCK_LFCLKSRC_SRC_Pos;
-    NRF_CLOCK->EVENTS_LFCLKSTARTED = 0;
-    NRF_CLOCK->TASKS_LFCLKSTART = 1;
-    while(NRF_CLOCK->EVENTS_LFCLKSTARTED == 0);
-    
-    // Configure the RTC for 1 minute wakeup (default)
-    CAL_RTC->PRESCALER = rtc_prescaler;
-    CAL_RTC->EVTENSET = RTC_EVTENSET_COMPARE0_Msk;
-    CAL_RTC->INTENSET = RTC_INTENSET_COMPARE0_Msk;
-    
-    CAL_RTC->CC[0] = m_rtc_increment * cc_scaler;
-    CAL_RTC->TASKS_START = 1;
-    NVIC_SetPriority(CAL_RTC_IRQn, CAL_RTC_IRQ_Priority);
-    NVIC_EnableIRQ(CAL_RTC_IRQn);
+     if (!initialized)
+     {
+          // Select the 32 kHz crystal and start the 32 kHz clock
+          NRF_CLOCK->LFCLKSRC = CLOCK_LFCLKSRC_SRC_Xtal << CLOCK_LFCLKSRC_SRC_Pos;
+          NRF_CLOCK->EVENTS_LFCLKSTARTED = 0;
+          NRF_CLOCK->TASKS_LFCLKSTART = 1;
+          while (NRF_CLOCK->EVENTS_LFCLKSTARTED == 0);
+
+          // Configure the RTC for 1 minute wakeup (default)
+          CAL_RTC->PRESCALER = rtc_prescaler;
+          CAL_RTC->EVTENSET = RTC_EVTENSET_COMPARE0_Msk;
+          CAL_RTC->INTENSET = RTC_INTENSET_COMPARE0_Msk;
+
+          CAL_RTC->CC[0] = m_rtc_increment * cc_scaler;
+          CAL_RTC->TASKS_START = 1;
+          NVIC_SetPriority(CAL_RTC_IRQn, CAL_RTC_IRQ_Priority);
+          NVIC_EnableIRQ(CAL_RTC_IRQn);
+     }
 }
 
 void nrf_cal_set_callback(void (*callback)(void), uint32_t interval)
@@ -49,7 +55,7 @@ void nrf_cal_set_callback(void (*callback)(void), uint32_t interval)
     m_rtc_increment = interval;
     m_time += CAL_RTC->COUNTER / cc_scaler;
     CAL_RTC->TASKS_CLEAR = 1;
-    CAL_RTC->CC[0] = interval * cc_scaler;  
+    CAL_RTC->CC[0] = interval * cc_scaler;
 }
  
 void nrf_cal_set_time(uint32_t year, uint32_t month, uint32_t day, uint32_t hour, uint32_t minute, uint32_t second)
