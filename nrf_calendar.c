@@ -30,11 +30,14 @@ void nrf_cal_init(void)
 {
      if (!initialized)
      {
+
+#ifndef SOFTDEVICE_PRESENT
           // Select the 32 kHz crystal and start the 32 kHz clock
           NRF_CLOCK->LFCLKSRC = CLOCK_LFCLKSRC_SRC_Xtal << CLOCK_LFCLKSRC_SRC_Pos;
           NRF_CLOCK->EVENTS_LFCLKSTARTED = 0;
           NRF_CLOCK->TASKS_LFCLKSTART = 1;
           while (NRF_CLOCK->EVENTS_LFCLKSTARTED == 0);
+#endif
 
           // Configure the RTC for 1 minute wakeup (default)
           CAL_RTC->PRESCALER = rtc_prescaler;
